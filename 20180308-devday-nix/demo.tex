@@ -1,0 +1,496 @@
+\documentclass[aspectratio=169]{beamer}
+\usepackage{listings}
+\usepackage{fancyvrb}
+\usepackage{xcolor}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+\usepackage{amsmath,bm,times}
+\newcommand{\mx}[1]{\mathbf{\bm{#1}}} % Matrix command
+\newcommand{\vc}[1]{\mathbf{\bm{#1}}} % Vector command
+
+\lstdefinestyle{base}{
+    language=C,
+    emptylines=1,
+    breaklines=true,
+    basicstyle=\ttfamily\color{black},
+    moredelim=**[is][\color{red}]{@}{@},
+}
+
+\newcommand{\tabitem}{%
+  \usebeamertemplate{itemize item}\hspace*{\labelsep}}
+
+\usetheme{metropolis}           % Use metropolis theme
+\title{The nix package manager}
+\subtitle{Declarative package management on Linux/OSX}
+\date{March 8, 2018}
+\author{Tobias Mayer}
+\institute{TomTom Development Germany}
+\begin{document}
+\maketitle
+
+\begin{frame}[label=package]{Motivation}
+    \begin{columns}[t]
+        \begin{column}{0.4\textwidth}
+            \begin{overlayarea}{\textwidth}{.4\textheight}
+                language (pip, cargo)
+                \smallskip
+                \only<2->{
+                \begin{itemize}
+                    \item[+] {declarative}
+                    \item[-] {build time / run time discrepancy}
+                    \item[-] {\color{red}incomplete}
+                \end{itemize}
+                }
+            \end{overlayarea}
+        \end{column}
+
+        \begin{column}{0.4\textwidth}
+            \begin{overlayarea}{\textwidth}{.4\textheight}
+                system (apt, dnf, brew)
+                \smallskip
+                \only<3->{
+                \begin{itemize}
+                    \item[+] {self-sufficient}
+                    \item[-] {tied to platform}
+                    \item[-] {\color{red}stateful}
+                    %\item[-] {\color{red}package creation}
+                \end{itemize}
+                }
+            \end{overlayarea}
+        \end{column}
+
+    \end{columns}
+    \begin{overlayarea}{\textwidth}{.2\textheight}
+    \only<4->{
+        \begin{center}
+            \begin{minipage}{0.4\textwidth}
+                \begin{itemize}
+                    \item[-] {\color{red}not reproducible}
+                    \item[-] {\color{red}not deterministic}
+                \end{itemize}
+            \end{minipage}
+        \end{center}
+    }
+    \end{overlayarea}
+\end{frame}
+
+%\begin{frame}{Motivation 1}
+%    System level package management (apt, dnf): \\
+%    \begin{itemize}
+%        \item stateful
+%        \item heterogeneous set of packages
+%        \item packaging often underspecified
+%    \end{itemize}
+%\end{frame}
+%
+%\begin{frame}{Motivation 2}
+%    Language level package management (pip, npm, cargo): \\
+%    \begin{itemize}
+%        \item does not provide platform
+%        \item does not provide non-native dependencies
+%        \item build time / run time discrepancy
+%    \end{itemize}
+%\end{frame}
+
+\begin{frame}<1,2>[label=ecosystem]{The nix ecosystem}
+    \begin{columns}[t]
+        \begin{column}{0.4\textwidth}
+            \begin{overlayarea}{\textwidth}{.5\textheight}
+                \begin{itemize}
+                        \only<1>{\item package manager}
+                        \only<2->{\item \textbf{package manager}}
+                        \only<1>{\item expression language}
+                        \only<2->{\item \textbf{expression language}}
+                        \only<1>{\item nixpkgs}
+                        \only<2->{\item \textbf{nixpkgs}}
+                        \only<1->{\item nixos}
+                        \only<1->{\item nixops}
+                        \only<1->{\item disnix}
+                        \only<1->{\item hydra}
+                \end{itemize}
+            \end{overlayarea}
+        \end{column}
+        \begin{column}{0.4\textwidth}
+            \begin{overlayarea}{\textwidth}{.5\textheight}
+                \includegraphics[width=\linewidth]{nixos-logo-only-hires.png}
+            \end{overlayarea}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Approach}
+    \small
+    \begin{itemize}
+            \only<1->{\item Source based distribution
+            \item Unique per-package install location \\
+                /nix/store/\textit{hash-name-version \\
+            example: /nix/store/86blj9iqyxwmdgkn3dyrpib1gkbmz91v-bash-4.4-p5}}
+    \only<2->{\item[->] multiple variants of a package available simultaneously}
+    \only<3->{\item[->] no duplication}
+    \only<4->{\item[->] transparent binary caching}
+    \end{itemize}
+
+
+\end{frame}
+
+\begin{frame}[label=cmdl]{The nix package manager}
+    \begin{overlayarea}{\textwidth}{.7\textheight}
+        Commands
+        \textbf{
+        \begin{itemize}
+                {\item nix-instantiate}
+                {\item nix-store}
+                {\item nix-shell}
+        \end{itemize}
+        }
+        \begin{itemize}
+                {\item nix-build}
+                {\item nix-env}
+                {\item nix-collect-garbage}
+                {\item nix-hash}
+                {\item …}
+                {\item nix (added with version 2, currently beta)}
+        \end{itemize}
+    \end{overlayarea}
+\end{frame}
+
+\begin{frame}[label=nixpkgs]{nixpkgs}
+    \begin{itemize}
+        \item github.com/NixOS/nixpkgs
+        \item Public collection of nix expressions
+        \item sorted into channels:
+            \begin{itemize}
+                \item nixpkgs-unstable
+                \item nixos-unstable
+                \item nixos-17.09
+                \item nixos-18.03
+                \item …
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile,label=eexpr]{example expression}
+    \small
+\begin{lstlisting}[style=base,breaklines=false]
+1  { @stdenv@, @fetchurl@, @perl@ }:
+2
+3  @stdenv@.mkDerivation {
+4    name = "hello-2.10";
+5    builder = ./builder.sh;
+6    src = @fetchurl@ {
+7      url = ftp://ftp.nl…/
+8                hello-2.10.tar.gz;
+9      sha256 = "1md7jsfd8pa…";
+10   };
+11   buildInputs = [ @perl@ ];
+11 }
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{.drv file}
+    \footnotesize
+\begin{lstlisting}[style=base,breaklines=false]
+Derive (
+  [("out", "/nix/store/kmwd1~hello-2.10", "", "")],
+  [("/nix/store/2zy7f~hello-2.10.tar.gz.drv", ["out"]),
+   ("/nix/store/dxlr6~stdenv.drv", ["out"]),
+   ("/nix/store/qkf7y~bash-4.4-p12.drv", ["out"]),
+   ("/nix/store/wy1na~perl-5.24.3.drv", ["out"])],
+  ["/nix/store/9krlz~default-builder.sh"],
+  "x86_64-linux",
+  "/nix/store/zqh3l~bash-4.4-p12/bin/bash",
+  ["-e", "/nix/store/9krlz~default-builder.sh"],
+  [("buildInputs", ""),
+   ("builder", "/nix/store/zqh3l~bash-4.4-p12/bin/bash"),
+   ("stdenv", "/nix/store/l3nz0~stdenv"),
+   ...
+   ("system", "x86_64-linux")]
+)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{.drv file (outputs)}
+    \footnotesize
+\begin{lstlisting}[style=base,breaklines=false]
+Derive (
+  @[("out", "/nix/store/kmwd1~hello-2.10", "", "")]@,
+  [("/nix/store/2zy7f~hello-2.10.tar.gz.drv", ["out"]),
+   ("/nix/store/dxlr6~stdenv.drv", ["out"]),
+   ("/nix/store/qkf7y~bash-4.4-p12.drv", ["out"]),
+   ("/nix/store/wy1na~perl-5.24.3.drv", ["out"])],
+  ["/nix/store/9krlz~default-builder.sh"],
+  "x86_64-linux",
+  "/nix/store/zqh3l~bash-4.4-p12/bin/bash",
+  ["-e", "/nix/store/9krlz~default-builder.sh"],
+  [("buildInputs", ""),
+   ("builder", "/nix/store/zqh3l~bash-4.4-p12/bin/bash"),
+   ("stdenv", "/nix/store/l3nz0~stdenv"),
+   ...
+   ("system", "x86_64-linux")]
+)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{.drv file (inputs)}
+    \footnotesize
+\begin{lstlisting}[style=base,breaklines=false]
+Derive (
+  [("out", "/nix/store/kmwd1~hello-2.10", "", "")],
+  @[("/nix/store/2zy7f~hello-2.10.tar.gz.drv", ["out"]),
+   ("/nix/store/dxlr6~stdenv.drv", ["out"]),
+   ("/nix/store/qkf7y~bash-4.4-p12.drv", ["out"]),
+   ("/nix/store/wy1na~perl-5.24.3.drv", ["out"])],
+  ["/nix/store/9krlz~default-builder.sh"]@,
+  "x86_64-linux",
+  "/nix/store/zqh3l~bash-4.4-p12/bin/bash",
+  ["-e", "/nix/store/9krlz~default-builder.sh"],
+  [("buildInputs", ""),
+   ("builder", "/nix/store/zqh3l~bash-4.4-p12/bin/bash"),
+   ("stdenv", "/nix/store/l3nz0~stdenv"),
+   ...
+   ("system", "x86_64-linux")]
+)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{.drv file (builder+arguments)}
+    \footnotesize
+\begin{lstlisting}[style=base,breaklines=false]
+Derive (
+  [("out", "/nix/store/kmwd1~hello-2.10", "", "")],
+  [("/nix/store/2zy7f~hello-2.10.tar.gz.drv", ["out"]),
+   ("/nix/store/dxlr6~stdenv.drv", ["out"]),
+   ("/nix/store/qkf7y~bash-4.4-p12.drv", ["out"]),
+   ("/nix/store/wy1na~perl-5.24.3.drv", ["out"])],
+  ["/nix/store/9krlz~default-builder.sh"],
+  "x86_64-linux",
+  @"/nix/store/zqh3l~bash-4.4-p12/bin/bash",
+  ["-e", "/nix/store/9krlz~default-builder.sh"]@,
+  [("buildInputs", ""),
+   ("builder", "/nix/store/zqh3l~bash-4.4-p12/bin/bash"),
+   ("stdenv", "/nix/store/l3nz0~stdenv"),
+   ...
+   ("system", "x86_64-linux")]
+)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{.drv file (environment variables)}
+    \footnotesize
+\begin{lstlisting}[style=base,breaklines=false]
+Derive (
+  [("out", "/nix/store/kmwd1~hello-2.10", "", "")],
+  [("/nix/store/2zy7f~hello-2.10.tar.gz.drv", ["out"]),
+   ("/nix/store/dxlr6~stdenv.drv", ["out"]),
+   ("/nix/store/qkf7y~bash-4.4-p12.drv", ["out"]),
+   ("/nix/store/wy1na~perl-5.24.3.drv", ["out"])],
+  ["/nix/store/9krlz~default-builder.sh"],
+  "x86_64-linux",
+  "/nix/store/zqh3l~bash-4.4-p12/bin/bash",
+  ["-e", "/nix/store/9krlz~default-builder.sh"],
+  @[("buildInputs", ""),
+   ("builder", "/nix/store/zqh3l~bash-4.4-p12/bin/bash"),
+   ("stdenv", "/nix/store/l3nz0~stdenv"),
+   ...
+   ("system", "x86_64-linux")]@
+)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[label=store]{The store (conceptual)}
+    \only<1>{initial state}
+    \only<2>{nix-instantiate -E 'with import <nixpkgs> \{ \}; hello'}
+    \only<3>{nix-store -r /nix/store/g85g3\char`~hello-2.10.drv}
+    \only<4>{ln -s /nix/store/g85g3\char`~hello-2.10.drv /nix/var/nix/gcroots/}
+    \only<5>{nix-store -gc}
+    \only<6>{rm /nix/var/nix/gcroots/g85g3\char`~hello-2.10.drv}
+    \only<7>{nix-store -gc}
+    \only<8>{final state}
+    \center
+    \only<1-8>{
+    \begin{tikzpicture}
+        % We need layers to draw the block diagram
+        \pgfdeclarelayer{background}
+        \pgfdeclarelayer{foreground}
+        \pgfsetlayers{background,main,foreground}
+
+        % Define a few styles and constants
+        \tikzstyle{pilp} = [->, thick, color=blue!50, text width=5em]
+        \def\blockdist{2.3}
+        \def\edgedist{2.5}
+
+        \tikzstyle{drvp}=[draw, fill=blue!20, text width=7em,
+             text centered, minimum height=1em, font=\tiny]
+        \tikzstyle{bop}=[draw, fill=red!20, text width=7em,
+             text centered, minimum height=1em, font=\tiny]
+        \only<1,8->{\tikzstyle{drv}=[text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+        \only<2-6>{\tikzstyle{drv}=[fill=blue!20, text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+        \only<7>{\tikzstyle{drv}=[fill=gray!20, text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+        \only<1-2,8->{\tikzstyle{bo}=[text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+        \only<3-6>{\tikzstyle{bo}=[fill=red!20, text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+        \only<7>{\tikzstyle{bo}=[fill=gray!20, text width=7em,
+                 text centered, minimum height=1em, font=\tiny]}
+
+        \only<1-6>{\tikzstyle{pil} = [->, thick, color=blue!50, text width=5em]}
+        \only<7->{\tikzstyle{pil} = [->, thick, color=gray!50, text width=5em]}
+
+        \node (gcc7) [drvp] {jb6h0\char`~gcc-7.3.0.drv};
+        \node (nethack) [drvp, below=2mm of gcc7] {8v9py\char`~nethack-3.6.0.drv};
+        \only<1,8>{
+            \node (gnumake) [drv, below=2mm of nethack] {};
+            \node (perl) [drv, below=2mm of gnumake] {};
+            \node (hello) [drv, below=2mm of perl] {};
+        }
+        \only<2-7>{
+            \node (gnumake) [draw,drv, below=2mm of nethack] {b1imi\char`~gnumake-4.2.1.drv};
+        \node (perl) [draw,drv, below=2mm of gnumake] {wy1na\char`~perl-5.24.3.drv};
+        \node (hello) [draw,drv, below=2mm of perl] {g85g3\char`~hello-2.10.drv};
+        }
+
+        \only<2-7>{
+        \path[every node/.style={font=\sffamily\small,
+              fill=white,inner sep=1pt}]
+           (gnumake.west)
+             edge [pil, bend left=40] (gcc7.west)
+
+           (perl.west)
+             edge [pil, bend left=40] (gnumake.west)
+             edge [pil, bend left=40] (gcc7.west)
+
+           (hello.west)
+             edge [pil, bend left=40] (perl.west)
+             edge [pil, bend left=40] (gnumake.west)
+             edge [pil, bend left=40] (gcc7.west);
+         }
+
+        \path[every node/.style={font=\sffamily\small,
+              fill=white,inner sep=1pt}]
+          (nethack.west)
+             edge [pilp, bend left=40] (gcc7.west);
+
+        \node (bgcc7) [bop, right=of gcc7] {7ygz3\char`~gcc-7.3.0};
+        \node (bnethack) [bop, right=of nethack] {v237i\char`~nethack-3.6.0};
+        \only<1,2,8>{
+            \node (bgnumake) [bo, right=of gnumake] {};
+            \node (bperl) [bo, right=of perl] {};
+            \node (bhello) [bo, right=of hello] {};
+        }
+        \only<3-7>{
+            \node (bgnumake) [draw, bo, right=of gnumake] {lhp5r\char`~gnumake-4.2.1};
+            \node (bperl) [draw, bo, right=of perl] {93865\char`~perl-5.24.3};
+            \node (bhello) [draw, bo, right=of hello] {kmwd1\char`~hello-2.10};
+        }
+
+        \path [draw, pilp] (gcc7) -- (bgcc7);
+        \path [draw, pilp] (nethack) -- (bnethack);
+        \only<3-7>{
+        \path [draw, pil] (gnumake) -- (bgnumake);
+        \path [draw, pil] (perl) -- (bperl);
+        \path [draw, pil] (hello) -- (bhello);
+    }
+
+    \node (drvs) [below of=hello] {derivations};
+        \node (bos) [below of=bhello] {outputs};
+
+        \path (gcc7) -- (bgcc7) node[midway] (auxlogical) {};
+        \node (logical) [above=0.5 of auxlogical] {\textbf{/nix/store}};
+
+        \path (hello.west |- drvs.south) node (ankgarbage) {};
+        \node (garbage) [below=7mm of ankgarbage, anchor=west] {\textbf{/nix/var/nix/gcroots/…}};
+        \path (garbage.east)+(0.5,0) node (gcl1) {};
+        \path (gcl1)+(0.5,0) node (gcl2) {};
+
+        \path[every node/.style={font=\sffamily\small,
+              fill=white,inner sep=1pt}]
+           (gcl2)
+           edge [pilp, dashed, bend right=10] (nethack.south);
+
+        \only<4-5>{\path[every node/.style={font=\sffamily\small,
+              fill=white,inner sep=1pt}]
+           (gcl1)
+           edge [pil, dashed, bend right=10] (hello.south);}
+
+        % Now it's time to draw the colored IMU and INS rectangles.
+        % To draw them behind the blocks we use pgf layers. This way we
+        % can use the above block coordinates to place the backgrounds
+        \begin{pgfonlayer}{background}
+            % Compute a few helper coordinates
+            \path (gcc7.west |- logical.north)+(-0.9,0.3) node (a) {};
+            \path (bos.south -| bhello.east)+(+0.5,-0.2) node (b) {};
+            \path[fill=yellow!20,rounded corners, draw=black!50, dashed]
+                (a) rectangle (b);
+            \path (gcc7.north west)+(-0.7,0.2) node (a) {};
+            \path (drvs.south -| gcc7.east)+(+0.2,-0.1) node (b) {};
+            \path[fill=blue!10,rounded corners, draw=black!50, dashed]
+                (a) rectangle (b);
+            \path (bgcc7.north west)+(-0.2,0.2) node (a) {};
+            \path (bos.south -| bgcc7.east)+(+0.2,-0.1) node (b) {};
+            \path[fill=red!10,rounded corners, draw=black!50, dashed]
+                (a) rectangle (b);
+            \path (gcc7.west |- garbage.north)+(-0.7,0.2) node (a) {};
+            \path (garbage.south -| bhello.east)+(0.2,-0.2) node (b) {};
+            \path[rounded corners, draw=black!50, dashed]
+                (a) rectangle (b);
+        \end{pgfonlayer}
+    \end{tikzpicture}
+    }
+\end{frame}
+
+\begin{frame}{expression language}
+    \begin{itemize}
+        \item functional
+        \item pure
+        \item lazy
+    \end{itemize}
+    \begin{itemize}
+        \item numbers, booleans, strings, paths
+        \item lists: [3 "hello" true]
+        \item sets: \{ x = 123; text = "Hi!"; y = f \{ foo = "bar"; \}; \}
+        \item function def:       funcname = pattern: body
+        \item function call:      funcname argument
+        \item function def (2):   funcname = \{ pattern1, pattern2 ? defaultval \}: body
+        \item function call (2):  funcname \{ argument set \}
+    \end{itemize}
+\end{frame}
+
+%\againframe{eexpr}
+
+\begin{frame}[fragile]{nix-shell expression}
+    shell.nix:
+    \small
+\begin{lstlisting}[style=base,breaklines=false]
+{}:
+let
+  pkgs = import (fetchTarball
+    https://github.com/NixOS/nixpkgs/archive/17.03.tar.gz) {};
+in with pkgs; {
+  environment = stdenv.mkDerivation {
+    name = "myProject";
+    nativeBuildInputs = [ cmake ];
+    buildInputs = [ boost ];
+  };
+}
+\end{lstlisting}
+use with 'nix-shell --pure --indirect --add-root gcroots/shell.gc'
+\end{frame}
+
+\begin{frame}{advanced topics}
+    \begin{itemize}
+        \item parameterized shells
+        \item link time deps with the same toolset
+        \item write expressions for dependencies
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[c]{fin}
+\centering
+Thank you! \\
+github.com/tobimpub/presentations/20180308-devday-nix
+\end{frame}
+\end{document}
